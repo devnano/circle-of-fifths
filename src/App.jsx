@@ -11,12 +11,15 @@ const MINORS_CIRCLE_PROPORTION = 0.4;
 /* 0.99 TO AVOID DRAWING THE SVG BORDER*/
 const OUTER_CIRCLE_PROPORTION = 0.99;
 const CIRCLE_STROKE_WIDTH = 1;
+const MAJOR_SCALE_FORMULA = [2,2,1,2,2,2];
+const MAJOR_SCALE_STEPS = MAJOR_SCALE_FORMULA.map((steps, i) => MAJOR_SCALE_FORMULA.slice(0,i+1).reduce((totalSteps, currentSteps) => totalSteps + currentSteps, 0))
 
 function App() {
   
   const [offset,setOffset] = useState(0);
   const [currentRotation, setCurrentRotation] = useState(0);
   const [targetRotation, setTargetRotation] = useState(0);
+  const [currentScale, setCurrentScale] = useState();
   // const [animateTransform, setAnimateTransform] = useState(null);
   const keys = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
   
@@ -34,8 +37,17 @@ function App() {
     setTargetRotation(offset * circleStep);
     // Disable animations for the time being...
     setCurrentRotation(offset * circleStep);
-  }
-  , [offset]);
+  }, [offset]);
+
+  useEffect(() => {
+    const keyIndex = keys.indexOf(circleOfFiths[offset]);
+    const scale = [keys[keyIndex], ...MAJOR_SCALE_STEPS.map((steps) => keys[(keyIndex+steps)%keys.length])];
+    setCurrentScale(scale);
+  }, [offset]);
+  useEffect(() => {
+    console.log(currentScale);
+    
+  }, [currentScale]);
 
   useEffect(() =>  document.querySelector("animateTransform") && document.querySelector("animateTransform").addEventListener('repeatEvent', () => {
       console.log("Repeat Event", "currentRoration", currentRotation, "targetRotation", targetRotation);
@@ -61,18 +73,40 @@ function App() {
       const radius = CIRCLE_RADIUS*((outerProp-Math.abs(innerProp-outerProp)/2));
       return <text onClick={()=> setKeyIndex(i) } x={`${CX + radius * sin}`} y={`${CY - radius * cos}`} fill="green">{texts[i]}</text>;
     };
-    const drawBound = (sin, cos, arc) =>  { 
-      const deltaRad = -arc/2;
+    const drawBound = (i, sin, cos, arc) =>  { 
+      let deltaRad = -arc/2;
       // Addition formula: 
       // 1. sin(x + y) = sin x cos y + cos x sin y
-      const totalSin = sin*Math.cos(deltaRad) + cos * Math.sin(deltaRad);
+      let totalSin = sin*Math.cos(deltaRad) + cos * Math.sin(deltaRad);
       // 2. cos(x + y) = cos x cos y - sin x sin y
-      const totalCos = cos*Math.cos(deltaRad) - sin *Math.sin(deltaRad);
+      let totalCos = cos*Math.cos(deltaRad) - sin *Math.sin(deltaRad);
+
+      const x1 = CX+innerProp*CIRCLE_RADIUS*totalSin;
+      const y1 = CY+innerProp*CIRCLE_RADIUS*totalCos;
+      const x2 = CX+outerProp*CIRCLE_RADIUS*totalSin;
+      const y2 = CY+outerProp*CIRCLE_RADIUS*totalCos;
+
+      deltaRad = arc/2;
+      // Addition formula: 
+      // 1. sin(x + y) = sin x cos y + cos x sin y
+      totalSin = sin*Math.cos(deltaRad) + cos * Math.sin(deltaRad);
+      // 2. cos(x + y) = cos x cos y - sin x sin y
+      totalCos = cos*Math.cos(deltaRad) - sin *Math.sin(deltaRad);
+
+      const x3 = CX+outerProp*CIRCLE_RADIUS*totalSin;
+      const y3 = CY+outerProp*CIRCLE_RADIUS*totalCos;
+      const x4 = CX+innerProp*CIRCLE_RADIUS*totalSin;
+      const y4 = CY+innerProp*CIRCLE_RADIUS*totalCos;
+      // console.log(currentScale && currentScale[i]);
+      console.log(circleOfFiths[i], currentScale && currentScale.indexOf(circleOfFiths[i]));
       
-      return <line x1={`${CX+innerProp*CIRCLE_RADIUS*totalSin}`} y1={`${CY+innerProp*CIRCLE_RADIUS*totalCos}`}  x2={`${CX+outerProp*CIRCLE_RADIUS*totalSin}`} y2={`${CY+outerProp*CIRCLE_RADIUS*totalCos}`} stroke="black" />;
+      return (<g>
+          <line x1={`${x1}`} y1={`${y1}`}  x2={`${x2}`} y2={`${y2}`} stroke="black" />
+         {(currentScale && currentScale.indexOf(circleOfFiths[i]) >= 0) && <path xmlns="http://www.w3.org/2000/svg" fill="cyan" stroke="red" stroke-width="8" d={`M ${x1} ${y1} L ${x2} ${y2} A ${outerProp*CIRCLE_RADIUS} ${outerProp*CIRCLE_RADIUS} 0 0 0 ${x3} ${y3} L ${x4} ${y4} A ${innerProp*CIRCLE_RADIUS} ${innerProp*CIRCLE_RADIUS} 0 0 1 ${x1} ${y1}  Z`}/>} 
+      </g>);
     }
-    const drawBounds = (_, sin, cos) => <g>{drawBound(sin, cos, circleStep)}</g>;
-    const radialFunctions = [drawText, drawBounds];
+    const drawBounds = (i, sin, cos) => <g>{drawBound(i, sin, cos, circleStep)}</g>;
+    const radialFunctions = [drawBounds, drawText];
     return (<g>
       {drawOuter && drawCircle(outerProp)}
       {drawCircle(innerProp)}
@@ -92,6 +126,7 @@ function App() {
           {createAnimation()}
           {drawLayer(circleOfFiths, OUTER_CIRCLE_PROPORTION, KEYS_CIRCLE_PROPORTION, true)}
           {drawLayer(relativeMinors, KEYS_CIRCLE_PROPORTION, MINORS_CIRCLE_PROPORTION)}
+          
         </g>
       </svg>
     </main>
