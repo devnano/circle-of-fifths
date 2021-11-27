@@ -2,10 +2,14 @@ import React, {useState, useEffect} from 'react';
 import './App.css';
 
 const CIRCLE_RADIUS = 400;
+
+const [CX, CY] = [CIRCLE_RADIUS,CIRCLE_RADIUS]; 
 const CIRCLE_DIAMETER = CIRCLE_RADIUS * 2;
 const CIRCLE_AMPLITUDE_RAD = Math.PI * 2;
 const KEYS_CIRCLE_PROPORTION = 0.7;
 const MINORS_CIRCLE_PROPORTION = 0.4;
+/* 0.99 TO AVOID DRAWING THE SVG BORDER*/
+const OUTER_CIRCLE_PROPORTION = 0.99;
 const CIRCLE_STROKE_WIDTH = 1;
 
 function App() {
@@ -22,13 +26,9 @@ function App() {
   const circleStep = (CIRCLE_AMPLITUDE_RAD) / keys.length;
   const setKeyIndex = (i) => {
     setOffset(i);
-    // console.log(circleOfFiths[i]);
-    // console.log(chords);
-    // setTargetRotation(-i * circleStep * 57);
     chords[i].play();
   }
-  const drawTexts = (circle, x, y, radius) => circle.map((k, i) => <text onClick={()=> setKeyIndex(i) } x={`${x + radius * Math.sin(i*circleStep-currentRotation)}`} y={`${y - radius * Math.cos(i*circleStep-currentRotation)}`} fill="red">{k}</text>
-  );
+
 
   useEffect(() => {
     setTargetRotation(offset * circleStep);
@@ -37,17 +37,6 @@ function App() {
   }
   , [offset]);
 
-  // useEffect(() => {
-  //   if(currentRotation === targetRotation) {
-  //     return;
-  //   }
-  //   const animateTransform = ;
-  //   console.log(animateTransform);
-
-    
-  //   setAnimateTransform(animateTransform);
-  // }
-  // , [targetRotation] );
   useEffect(() =>  document.querySelector("animateTransform") && document.querySelector("animateTransform").addEventListener('repeatEvent', () => {
       console.log("Repeat Event", "currentRoration", currentRotation, "targetRotation", targetRotation);
       setCurrentRotation(targetRotation);
@@ -64,18 +53,45 @@ function App() {
                             repeatCount="indefinite"
                             fill="freeze"
                             />);
-           
+  
+  const drawCircle = (p) => <circle cx={`${CX}`} cy={`${CY}`} r={`${CIRCLE_RADIUS * p}`} stroke="black" stroke-width={`${CIRCLE_STROKE_WIDTH}`} fill="white" fill-opacity="0" />;
+  
+  const drawLayer = (texts, outerProp, innerProp, drawOuter=false) => {
+    const drawText = (i, sin, cos) =>  {
+      const radius = CIRCLE_RADIUS*((outerProp-Math.abs(innerProp-outerProp)/2));
+      return <text onClick={()=> setKeyIndex(i) } x={`${CX + radius * sin}`} y={`${CY - radius * cos}`} fill="green">{texts[i]}</text>;
+    };
+    const drawBound = (sin, cos, arc) =>  { 
+      const deltaRad = -arc/2;
+      // Addition formula: 
+      // 1. sin(x + y) = sin x cos y + cos x sin y
+      const totalSin = sin*Math.cos(deltaRad) + cos * Math.sin(deltaRad);
+      // 2. cos(x + y) = cos x cos y - sin x sin y
+      const totalCos = cos*Math.cos(deltaRad) - sin *Math.sin(deltaRad);
+      
+      return <line x1={`${CX+innerProp*CIRCLE_RADIUS*totalSin}`} y1={`${CY+innerProp*CIRCLE_RADIUS*totalCos}`}  x2={`${CX+outerProp*CIRCLE_RADIUS*totalSin}`} y2={`${CY+outerProp*CIRCLE_RADIUS*totalCos}`} stroke="black" />;
+    }
+    const drawBounds = (_, sin, cos) => <g>{drawBound(sin, cos, circleStep)}</g>;
+    const radialFunctions = [drawText, drawBounds];
+    return (<g>
+      {drawOuter && drawCircle(outerProp)}
+      {drawCircle(innerProp)}
+
+      {radialFunctions.flatMap(f => texts.map((_, i) => {
+        const angle = i*circleStep-currentRotation;
+        return f(i, Math.sin(angle), Math.cos(angle));
+        
+       }))
+      }
+    </g>);
+  }     
   return (
     <main>
       <svg height={`${CIRCLE_DIAMETER}`} width={`${CIRCLE_DIAMETER}`}>
         <g>
-         {createAnimation()}
-          {/* - CIRCLE_STROKE_WIDTH TO AVOID DRAWING THE SVG BORDER*/}
-          <circle cx={`${CIRCLE_RADIUS}`} cy={`${CIRCLE_RADIUS}`} r={`${CIRCLE_RADIUS - CIRCLE_STROKE_WIDTH}`} stroke="black" stroke-width="1" fill-opacity="0" />
-          <circle cx={`${CIRCLE_RADIUS}`} cy={`${CIRCLE_RADIUS}`} r={`${CIRCLE_RADIUS * KEYS_CIRCLE_PROPORTION}`} stroke="black" stroke-width="1" fill="white" fill-opacity="0" />
-          {drawTexts(circleOfFiths, CIRCLE_RADIUS, CIRCLE_RADIUS, CIRCLE_RADIUS*((1-Math.abs(KEYS_CIRCLE_PROPORTION-1)/2)))}
-          <circle cx={`${CIRCLE_RADIUS}`} cy={`${CIRCLE_RADIUS}`} r={`${CIRCLE_RADIUS * MINORS_CIRCLE_PROPORTION}`} stroke="black" stroke-width="1" fill="white" fill-opacity="0" />
-          {drawTexts(relativeMinors, CIRCLE_RADIUS, CIRCLE_RADIUS, CIRCLE_RADIUS*((KEYS_CIRCLE_PROPORTION-Math.abs(MINORS_CIRCLE_PROPORTION-KEYS_CIRCLE_PROPORTION)/2)))}
+          {createAnimation()}
+          {drawLayer(circleOfFiths, OUTER_CIRCLE_PROPORTION, KEYS_CIRCLE_PROPORTION, true)}
+          {drawLayer(relativeMinors, KEYS_CIRCLE_PROPORTION, MINORS_CIRCLE_PROPORTION)}
         </g>
       </svg>
     </main>
